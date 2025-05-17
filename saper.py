@@ -30,7 +30,12 @@ class Cell(QWidget):
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
         r = event.rect()
-        outer, inner = Qt.GlobalColor.gray, Qt.GlobalColor.lightGray
+
+        if self.is_revealed:
+            inner = self.palette().color(QPalette.ColorRole.NColorRoles.Window)
+        else:
+            inner = Qt.GlobalColor.lightGray
+        outer = Qt.GlobalColor.gray
         p.fillRect(r, QBrush(inner))
         pen = QPen(outer)
         pen.setWidth(1)
@@ -42,7 +47,7 @@ class Cell(QWidget):
                 p.drawPixmap(r, QPixmap(IMG_BOMB))
             elif self.is_start:
                 p.drawPixmap(r, QPixmap(IMG_START))
-            else:
+            elif self.mines_around > 0:
                 pen = QPen(Qt.GlobalColor.black)
                 p.setPen(pen)
                 f = p.font()
