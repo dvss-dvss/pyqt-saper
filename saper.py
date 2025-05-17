@@ -17,6 +17,7 @@ IMG_CLOCK = QImage("./images/clock.png")
 IMG_START = QImage("./images/rocket.png")
 
 class Cell(QWidget):
+    expandable = pyqtSignal(int, int)
 
     def __init__(self, x, y):
         super().__init__()
@@ -64,6 +65,8 @@ class Cell(QWidget):
     def reveal(self):
         if not self.is_revealed:
             self.reveal_self()
+            if self.mines_around == 0:
+                self.expandable.emit(self.x, self.y)
 
     def reveal_self(self):
         self.is_revealed = True
@@ -136,6 +139,7 @@ class MainWindow(QMainWindow):
             for y in range(self.board_size):
                 cell = Cell(x, y)
                 self.grid.addWidget(cell, x, y)
+                cell.expandable.connect(self.expand_reveal)
 
     def reset(self):
         self.mines_count = LEVELS[self.level][1]
@@ -196,7 +200,14 @@ class MainWindow(QMainWindow):
             if not cell.is_mine:
                 cell.click()
                 
+    def expand_reveal(self, x, y):
+        for _, _, cell in self.get_revealable_cells(x,y):
+            cell.reveal()
 
+    def get_revealable_cells(self, x, y):
+        for xi, yi, cell in self.get_around_cells(x, y):
+            if not cell.is_mine and not cell.is_flagged and not cell.is_revealed:
+                yield (xi, yi, cell)
 
 if __name__ == "__main__":
     app = QApplication([])
