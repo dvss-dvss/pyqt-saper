@@ -138,7 +138,7 @@ class MainWindow(QMainWindow):
         main_layout.addLayout(toolbar)
 
         self.grid = QGridLayout()
-        self.grid.setSpacing(5)
+        self.grid.setSpacing(5) 
         main_layout.addLayout(self.grid)
 
         central_widget.setLayout(main_layout)
