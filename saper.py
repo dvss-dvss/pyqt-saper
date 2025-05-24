@@ -1,5 +1,6 @@
 import random
 import time
+from turtle import pos
 
 from PyQt6.QtGui import *
 from PyQt6.QtWidgets import *
@@ -16,8 +17,22 @@ IMG_BOMB = QImage("./images/bomb.png")
 IMG_CLOCK = QImage("./images/clock.png")
 IMG_START = QImage("./images/rocket.png")
 
+STATUS_READY = 0
+STATUS_PLAY = 1
+STATUS_FAILED = 2
+STATUS_SUCCESS = 3
+
+STATUS_ICONS = {
+    STATUS_READY: "./images/plus.png",
+    STATUS_PLAY: "./images/smiley.png",
+    STATUS_FAILED: "./images/cross.png",
+    STATUS_SUCCESS: "./images/smiley-lol.png",
+}
+
+
 class Cell(QWidget):
     expandable = pyqtSignal(int, int)
+    clicked = pyqtSignal()
 
     def __init__(self, x, y):
         super().__init__()
@@ -78,9 +93,10 @@ class Cell(QWidget):
         self.update()
 
     def mouseReleaseEvent(self, event):
+        self.clicked.emit()
         if event.button() == Qt.MouseButton.LeftButton:
             self.click()
-        
+
 
 class MainWindow(QMainWindow):
 
@@ -94,6 +110,10 @@ class MainWindow(QMainWindow):
         self.setFixedSize(300, 300)
         self.initUI()
         self.init_grid()
+        self.update_status(STATUS_READY)
+        self._timer = QTimer()
+        self._timer.timeout.connect(self.update_timer)
+        self._timer.start(1000)
         self.reset()
         self.setFixedSize(self.sizeHint())
         self.show()
@@ -120,10 +140,10 @@ class MainWindow(QMainWindow):
         self.button.setIcon(QIcon("./images/smiley.png"))
         self.button.setFlat(True)
 
-
         l = QLabel()
         l.setPixmap(QPixmap.fromImage(IMG_BOMB))
         l.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        toolbar.addWidget(l)
 
         toolbar.addWidget(self.mines)
         toolbar.addWidget(self.button)
@@ -138,7 +158,7 @@ class MainWindow(QMainWindow):
         main_layout.addLayout(toolbar)
 
         self.grid = QGridLayout()
-        self.grid.setSpacing(5) 
+        self.grid.setSpacing(5)
         main_layout.addLayout(self.grid)
 
         central_widget.setLayout(main_layout)
@@ -150,6 +170,7 @@ class MainWindow(QMainWindow):
                 cell = Cell(x, y)
                 self.grid.addWidget(cell, x, y)
                 cell.expandable.connect(self.expand_reveal)
+                cell.clicked.connect(self.handle_click)
 
     def reset(self):
         self.mines_count = LEVELS[self.level][1]
@@ -165,12 +186,11 @@ class MainWindow(QMainWindow):
 
     def get_cell(self, x, y):
         return self.grid.itemAtPosition(x, y).widget()
-            
+
     def get_all_cells(self):
         for x in range(self.board_size):
             for y in range(self.board_size):
-                yield (x, y, self.get_cell(x,y))
-
+                yield (x, y, self.get_cell(x, y))
 
     def set_mines(self):
         positions = []
@@ -181,7 +201,7 @@ class MainWindow(QMainWindow):
                 self.get_cell(x, y).is_mine = True
                 positions.append((x, y))
         return positions
-    
+
     def calc_mines_around(self):
         for x, y, cell in self.get_all_cells():
             cell.mines_around = self.get_mines_around(x, y)
@@ -189,35 +209,50 @@ class MainWindow(QMainWindow):
     def get_mines_around(self, x, y):
         cells = [cell for _, _, cell in self.get_around_cells(x, y)]
         return sum(1 if cell.is_mine else 0 for cell in cells)
-    
+
     def get_around_cells(self, x, y):
         positions = []
-        for xi in range(max(0, x-1), min(x+2, self.board_size)):
-            for yi in range(max(0, y-1), min(y+2, self.board_size)):
+        for xi in range(max(0, x - 1), min(x + 2, self.board_size)):
+            for yi in range(max(0, y - 1), min(y + 2, self.board_size)):
                 positions.append((xi, yi, self.get_cell(xi, yi)))
         return positions
-    
+
     def set_start(self):
         empty_cells = [
             cell
             for x, y, cell in self.get_all_cells()
             if not cell.is_mine and cell.mines_around == 0
         ]
-        start_choice = random.choice(empty_cells)
-        start_choice.is_start = True
+        start_cell = random.choice(empty_cells)
+        start_cell.is_start = True
 
-        for _, _, cell in self.get_around_cells(start_choice.x, start_choice.y):
+        for _, _, cell in self.get_around_cells(start_cell.x, start_cell.y):
             if not cell.is_mine:
                 cell.click()
-                
+
     def expand_reveal(self, x, y):
-        for _, _, cell in self.get_revealable_cells(x,y):
+        for _, _, cell in self.get_revealable_cells(x, y):
             cell.reveal()
 
     def get_revealable_cells(self, x, y):
         for xi, yi, cell in self.get_around_cells(x, y):
             if not cell.is_mine and not cell.is_flagged and not cell.is_revealed:
                 yield (xi, yi, cell)
+
+    def update_status(self, status):
+        self.status = status
+        self.button.setIcon(QIcon(STATUS_ICONS[self.status]))
+
+    def handle_click(self):
+        if self.status == STATUS_READY:
+            self.update_status(STATUS_PLAY)
+            self._timer_start = int(time.time())
+
+    def update_timer(self):
+        if self.status == STATUS_PLAY:
+            n_seconds = int(time.time()) - self._timer_start
+            self.clock.setText(f"{n_seconds:03d}")
+
 
 if __name__ == "__main__":
     app = QApplication([])
