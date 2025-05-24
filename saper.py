@@ -33,6 +33,7 @@ STATUS_ICONS = {
 class Cell(QWidget):
     expandable = pyqtSignal(int, int)
     clicked = pyqtSignal()
+    game_over = pyqtSignal()
 
     def __init__(self, x, y):
         super().__init__()
@@ -46,7 +47,9 @@ class Cell(QWidget):
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
         r = event.rect()
 
-        if self.is_revealed:
+        if self.is_end:
+            inner = Qt.GlobalColor.black
+        elif self.is_revealed:
             inner = self.palette().color(QPalette.ColorRole.NColorRoles.Window)
         else:
             inner = Qt.GlobalColor.lightGray
@@ -72,6 +75,7 @@ class Cell(QWidget):
 
     def reset(self):
         self.is_start = False
+        self.is_end = False
         self.is_mine = False
         self.mines_around = 0
         self.is_revealed = False
@@ -87,6 +91,9 @@ class Cell(QWidget):
             self.reveal_self()
             if self.mines_around == 0:
                 self.expandable.emit(self.x, self.y)
+            if self.is_mine:
+                self.is_end = True
+                self.game_over.emit()
 
     def reveal_self(self):
         self.is_revealed = True
@@ -171,6 +178,7 @@ class MainWindow(QMainWindow):
                 self.grid.addWidget(cell, x, y)
                 cell.expandable.connect(self.expand_reveal)
                 cell.clicked.connect(self.handle_click)
+                cell.game_over.connect(self.game_over)
 
     def reset(self):
         self.mines_count = LEVELS[self.level][1]
@@ -253,6 +261,9 @@ class MainWindow(QMainWindow):
             n_seconds = int(time.time()) - self._timer_start
             self.clock.setText(f"{n_seconds:03d}")
 
+    def game_over(self):
+        self.update_status(STATUS_FAILED)
+        
 
 if __name__ == "__main__":
     app = QApplication([])
